@@ -1,4 +1,4 @@
-var DEFAULTS, Pie, accuracy, color, discardTransparent, id, path, result, show;
+var ColorList, DEFAULTS, Pie, accuracy, color, discardTransparent, id, path, result, show, x, _i, _len;
 
 DEFAULTS = {
   canvasName: "__pie_workspace",
@@ -6,11 +6,75 @@ DEFAULTS = {
   scale: 10
 };
 
+ColorList = (function() {
+
+  function ColorList() {
+    this.list = {};
+    this.colors = {};
+  }
+
+  ColorList.prototype.add = function(color) {
+    if (this.list[color] === void 0) {
+      return this.list[color] = 1;
+    } else {
+      return this.list[color] += 1;
+    }
+  };
+
+  ColorList.prototype.sort = function() {
+    this.omit(15);
+    return this.disectMostUsedColors();
+  };
+
+  ColorList.prototype.omit = function(threshold) {
+    _.each(this.list, function(value, key, list) {
+      if (value < threshold) {
+        return delete list[key];
+      } else {
+
+      }
+    });
+    console.log("After Ommissions:");
+    return console.log(this.list);
+  };
+
+  ColorList.prototype.disectMostUsedColors = function(numberOfColors) {
+    var key, list, max, results, x, _i;
+    console.log("Disecting");
+    if (!numberOfColors) {
+      numberOfColors = 5;
+    }
+    list = this.list;
+    results = [];
+    for (x = _i = 0; 0 <= numberOfColors ? _i <= numberOfColors : _i >= numberOfColors; x = 0 <= numberOfColors ? ++_i : --_i) {
+      max = _.max(list);
+      key = null;
+      _.find(list, function(v, k, l) {
+        if (v === max) {
+          key = k;
+          return k;
+        } else {
+
+        }
+      });
+      results.push(key);
+      delete list[key];
+    }
+    console.log(results);
+    this.colors = results;
+  };
+
+  return ColorList;
+
+})();
+
 Pie = function(options) {
-  var canvas, componentToHex, context, convertRGBAtoHex, data, done, getData, img, loaded, processData, processingTime, retrievalTime, totalTime;
+  var canvas, colorListTime, colorlist, componentToHex, context, convertRGBAtoHex, data, done, getData, img, loaded, processData, processingTime, retrievalTime, sortDataIntoColorList, totalTime;
   totalTime = Date.now();
   retrievalTime = null;
   processingTime = null;
+  colorListTime = null;
+  colorlist = null;
   canvas = document.getElementById("__pie_workspace");
   context = canvas.getContext('2d');
   data = [];
@@ -18,13 +82,13 @@ Pie = function(options) {
     var hex;
     hex = c.toString(16);
     if (hex.length === 1) {
-      return hex = "0" + hex;
+      return (hex = "0" + ("" + hex));
     } else {
       return hex;
     }
   };
   convertRGBAtoHex = function(r, g, b) {
-    return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+    return "#" + componentToHex(r) + "" + componentToHex(g) + "" + componentToHex(b);
   };
   loaded = function() {
     canvas.width = img.width;
@@ -60,30 +124,19 @@ Pie = function(options) {
     retrievalTime = (Date.now() - retrievalTime) / 1000;
     return processData();
   };
-  done = function(data) {
-    totalTime = (Date.now() - totalTime) / 1000;
-    console.group("Benchmarks");
-    console.log("Total duration:", totalTime, "seconds.");
-    console.log("Retrieval from canvas duration:", retrievalTime, "seconds.");
-    console.log("Processing Data duration:", processingTime, "seconds.");
-    console.log("Code Execution / Difference:", totalTime - (processingTime + retrievalTime), "seconds.");
-    console.groupEnd("Benchmarks");
-    return data;
-  };
   processData = function() {
     var oldData, processDatum, x, _i, _len;
     processingTime = Date.now();
     oldData = data;
     data = [];
     processDatum = function(datum) {
-      var hex, i, index, r, skipAmount, _i, _len, _ref, _results;
+      var b, g, hex, i, r, skipAmount, _i, _len, _ref, _results;
       skipAmount = 2;
-      index = 0;
       _ref = 4 * 2;
       _results = [];
       for ((_ref > 0 ? (i = _i = 0, _len = datum.length) : i = _i = datum.length - 1); _ref > 0 ? _i < _len : _i >= 0; i = _i += _ref) {
         r = datum[i];
-        if (i + 3 < 255) {
+        if (datum[i + 3] < 255) {
           hex = "transparent";
           if (!options.discardTransparent) {
             _results.push(data.push(hex));
@@ -91,7 +144,9 @@ Pie = function(options) {
             _results.push(void 0);
           }
         } else {
-          hex = convertRGBAtoHex(r, i + 1, i + 2, i + 3);
+          g = datum[i + 1];
+          b = datum[i + 2];
+          hex = convertRGBAtoHex(r, g, b);
           _results.push(data.push(hex));
         }
       }
@@ -102,7 +157,33 @@ Pie = function(options) {
       processDatum(x.data);
     }
     processingTime = (Date.now() - processingTime) / 1000;
-    return done();
+    return sortDataIntoColorList();
+  };
+  sortDataIntoColorList = function() {
+    var x, _i, _len;
+    colorListTime = Date.now();
+    colorlist = new ColorList();
+    for (_i = 0, _len = data.length; _i < _len; _i++) {
+      x = data[_i];
+      colorlist.add(x);
+    }
+    colorlist.sort();
+    colorListTime = (Date.now() - colorListTime) / 1000;
+    console.log(colorlist);
+    done(colorlist.colors);
+  };
+  done = function(results) {
+    totalTime = (Date.now() - totalTime) / 1000;
+    console.groupCollapsed("Benchmarks");
+    console.log("Total duration:", totalTime, "seconds.");
+    console.log("Data Ommission:", 10 - options.accuracy + "0%");
+    console.log("Retrieval from canvas duration:", retrievalTime, "seconds.");
+    console.log("Processing Data duration:", processingTime, "seconds.");
+    console.log("Sorting Color Data duration:", colorListTime, "seconds.");
+    console.log("Code Execution / Difference:", totalTime - (processingTime + retrievalTime + colorListTime), "seconds.");
+    console.groupEnd("Benchmarks");
+    data = results;
+    return data;
   };
   if (options.path) {
     img = new Image();
@@ -141,6 +222,13 @@ result = Pie({
   discardTransparent: discardTransparent
 });
 
+console.log(" results:");
+
 console.log(result);
+
+for (_i = 0, _len = result.length; _i < _len; _i++) {
+  x = result[_i];
+  console.log("%c" + x, "border-bottom: 5px solid " + x + ";");
+}
 
 // Generated by CoffeeScript 1.5.0-pre
